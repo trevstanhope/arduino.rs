@@ -1,7 +1,10 @@
+// Crates
 extern crate serial;
 extern crate time;
 extern crate rustc_serialize;
 
+// Modules
+mod lib;
 use std::thread;
 use std::env;
 use time::Duration;
@@ -35,8 +38,8 @@ fn main() {
 fn interact<T: SerialPort>(port: &mut T) -> serial::Result<()> {
     let in_buf: Vec<u8> = (0..15).collect();
     let mut out_buf: Vec<u8> = (0..17).collect();
-    let mut t1;
-    let mut t2;
+    let mut t1 = time::precise_time_ns();
+    let mut t2 = time::precise_time_ns();
     // Set configuration
     try!(port.configure(&SETTINGS));
     try!(port.set_timeout(Duration::seconds(3)));
@@ -44,27 +47,22 @@ fn interact<T: SerialPort>(port: &mut T) -> serial::Result<()> {
 
     // Write value
     println!("[WARN] writing to device...");
-    t1 = time::precise_time_ns();
-    try!(port.write(&in_buf[..]));
     t2 = time::precise_time_ns();
-    println!("\tdone, {} ns", (t2 - t1));
+    try!(port.write(&in_buf[..]));
+    println!("\tok, {} ns", (time::precise_time_ns() - t2));
 
     // Read responses
     println!("[WARN] reading from device...");
-    t1 = time::precise_time_ns();
-    try!(port.read(&mut out_buf[..]));
     t2 = time::precise_time_ns();
-    println!("\tdone, {} ns", (t2 - t1));
-
-    // As String    
-    println!("[WARN] transcoding serial to string...");
-    let s = String::from_utf8_lossy(&out_buf);
-    println!("\tstring: {}", s);
+    try!(port.read(&mut out_buf[..]));
+    println!("\tok, {} ns", (time::precise_time_ns() - t2));
 
     // As JSON obj
     println!("[WARN] parsing to JSON...");
-    let optb = json::Json::from_str("{\"foo\":true,\"bar\":false}");
-    let d = json::Json::from_str(&s).unwrap_or(optb.unwrap());
+    let s = String::from_utf8_lossy(&out_buf);
+    println!("\tstring: {}", s);
+    let optb = json::Json::from_str("{\"foo\":null,\"bar\":null}").unwrap();
+    let d = json::Json::from_str(&s).unwrap_or(optb); // if fails, default None obj
     println!("\tdata: {}", d);
     println!("\tis object: {}", d.is_object());
     let obj = d.as_object().unwrap();
@@ -77,9 +75,12 @@ fn interact<T: SerialPort>(port: &mut T) -> serial::Result<()> {
     for (key, value) in obj.iter() {
         println!("\t{}: {}", key, match *value {
             json::Json::U64(v) => format!("{} (u64)", v),
+            json::Json::Null => format!("null"),
             json::Json::String(ref v) => format!("{} (string)", v),
             _ => format!("other")
         });
     }
+    t2 = time::precise_time_ns();
+    println!("\tdone, {} Hz", 1000000000 / (t2 - t1));
     return Ok(()); // return Result type
 }
