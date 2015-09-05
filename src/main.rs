@@ -23,48 +23,59 @@ fn main() {
     for arg in env::args_os().skip(1) { // Get arguments
         println!("opening port: {:?}", arg);
         let mut port = serial::open(&arg).unwrap();
-        interact(&mut port).unwrap(); // interact with port
+        thread::sleep_ms(1000);
+        // Basic
+        loop {
+            interact(&mut port).unwrap(); // interact with port
+        }
     }
 }
 
 // Interact with serial port
 fn interact<T: SerialPort>(port: &mut T) -> serial::Result<()> {
     let in_buf: Vec<u8> = (0..15).collect();
-    let mut out_buf: Vec<u8> = (0..20).collect();
-
+    let mut out_buf: Vec<u8> = (0..17).collect();
+    let mut t1;
+    let mut t2;
     // Set configuration
     try!(port.configure(&SETTINGS));
     try!(port.set_timeout(Duration::seconds(3)));
-    thread::sleep_ms(1000);
+    thread::sleep_ms(350);
 
     // Write value
-    println!("writing to device...");
+    println!("[WARN] writing to device...");
+    t1 = time::precise_time_ns();
     try!(port.write(&in_buf[..]));
-    thread::sleep_ms(1000);
+    t2 = time::precise_time_ns();
+    println!("\tdone, {} ns", (t2 - t1));
 
     // Read responses
-    println!("reading from device...");
+    println!("[WARN] reading from device...");
+    t1 = time::precise_time_ns();
     try!(port.read(&mut out_buf[..]));
-    thread::sleep_ms(100);
+    t2 = time::precise_time_ns();
+    println!("\tdone, {} ns", (t2 - t1));
 
     // As String    
-    //let s = String::from_utf8_lossy(&out_buf);
-    let s = "{\"foo\":0,\"bar\":1}";
-    println!("string: {}", s);
+    println!("[WARN] transcoding serial to string...");
+    let s = String::from_utf8_lossy(&out_buf);
+    println!("\tstring: {}", s);
 
     // As JSON obj
-    let d = json::Json::from_str(&s).unwrap();
-    println!("data: {}", d);
-    println!("is object: {}", d.is_object());
+    println!("[WARN] parsing to JSON...");
+    let optb = json::Json::from_str("{\"foo\":true,\"bar\":false}");
+    let d = json::Json::from_str(&s).unwrap_or(optb.unwrap());
+    println!("\tdata: {}", d);
+    println!("\tis object: {}", d.is_object());
     let obj = d.as_object().unwrap();
 
     // Get 'foo'
     let foo = obj.get("bar").unwrap();
-    println!("is foo u64? {}", foo.is_u64());
+    println!("\tis foo u64? {}", foo.is_u64());
 
     // Iterate through object
     for (key, value) in obj.iter() {
-        println!("{}: {}", key, match *value {
+        println!("\t{}: {}", key, match *value {
             json::Json::U64(v) => format!("{} (u64)", v),
             json::Json::String(ref v) => format!("{} (string)", v),
             _ => format!("other")
