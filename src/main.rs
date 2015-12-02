@@ -43,7 +43,7 @@ fn interact<T: SerialPort>(port: &mut T) -> serial::Result<()> {
     // Set configuration
     try!(port.configure(&SETTINGS));
     try!(port.set_timeout(Duration::seconds(3)));
-    thread::sleep_ms(350);
+    thread::sleep_ms(350); // fails when slower
 
     // Write value
     println!("[WARN] writing to device...");
